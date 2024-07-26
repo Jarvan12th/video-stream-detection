@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Video Stream</title>
+<style>
+    video {
+        width: 100%;
+        height: auto;
+    }
+</style>
+</head>
+<body>
+<img id="videoOutput" alt="Video Stream">
+
+<script>
+    const videoOutput = document.getElementById('videoOutput');
+    const ws = new WebSocket('ws://localhost:8000/video_process');
+
+    ws.onmessage = function(event) {
+        const arrayBuffer = event.data;
+        const blob = new Blob([arrayBuffer], { type: 'image/jpeg' });
+        const url = URL.createObjectURL(blob);
+        videoOutput.src = url;
+    };
+
+    ws.onerror = function(event) {
+        console.log("WebSocket error observed:", event.message);
+        console.error("WebSocket error observed:", event);
+    };
+
+    ws.onclose = function(event) {
+        console.log("WebSocket is closed now.");
+    };
+</script>
+</body>
+</html>

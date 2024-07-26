@@ -1,0 +1,6 @@
+/video-stream-detection-env
+/video_stream_detection_yolo_model
+.DS_Store
+
+.vscode/
+__pycache__/
