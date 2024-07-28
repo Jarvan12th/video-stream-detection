@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Start Streaming</title>
+</head>
+<body>
+    <h1>Video Streaming Control</h1>
+    <button id="startButton">Start Streaming</button>
+    <p id="status">Press the button to start the stream.</p>
+
+    <script>
+        document.getElementById('startButton').addEventListener('click', function() {
+            fetch('http://localhost:8000/start-streaming', { // Update this URL if your API is hosted elsewhere
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).then(response => response.json())
+              .then(data => {
+                  console.log(data);
+                  document.getElementById('status').innerText = "Streaming started: " + data.message;
+              })
+              .catch(error => {
+                  console.error('Error:', error);
+                  document.getElementById('status').innerText = "Error starting the stream.";
+              });
+        });
+    </script>
+</body>
+</html>

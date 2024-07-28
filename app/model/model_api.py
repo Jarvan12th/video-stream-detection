@@ -1,6 +1,8 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
 import cv2
+import ffmpeg
 import numpy as np
 import asyncio
 import torch
@@ -10,7 +12,17 @@ import os
 
 app = FastAPI()
 
-RTMP_URL = "rtmp://10.132.100.245:1900/live"
+# Add CORS middleware to allow requests from any origin
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
+RTMP_URL = "rtmp://192.168.1.3:1935/live/source"
+STREAM_URL = "rtmp://192.168.1.3:1935/live/destination"  # Destination RTMP URL
 
 # Load the model
 model = torch.load("./video_stream_detection_yolo_model/video_stream_detection_model.pth")
@@ -56,10 +68,58 @@ def predict_url(request: ImageURL):
 
     return {"prediction": prediction}
 
+@app.post("/start-streaming")
+def start_streaming(background_tasks: BackgroundTasks):
+    background_tasks.add_task(stream_video)
+    return {"message": "Streaming started successfully"}
+
+def stream_video():
+    cap = cv2.VideoCapture(RTMP_URL)
+    width, height = int(cap.get(3)), int(cap.get(4))
+    process = (
+        ffmpeg
+        .input('pipe:', format='rawvideo', pix_fmt='bgr24', s=f'{width}x{height}')
+        .output(STREAM_URL, format='flv', vcodec='libx264', pix_fmt='yuv420p', preset='fast')
+        .overwrite_output()
+        .run_async(pipe_stdin=True)
+    )
+
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break  # If no frame is read, break the loop
+
+            processed_frame = process_frame(frame)  # Process the frame using the loaded model
+            # process.stdin.write(processed_frame.tobytes())  # Write the processed frame to FFmpeg stdin
+            # Check if FFmpeg process is still running
+            if process.poll() is None:
+                process.stdin.write(processed_frame.tobytes())
+            else:
+                print("FFmpeg process has terminated unexpectedly.")
+                break
+    finally:
+        cap.release()  # Release the video capture object
+        # process.stdin.close()
+        # process.wait()
+        if process.poll() is None:
+            process.stdin.close()
+            process.wait()
+
 @app.websocket_route("/video_process")
 async def video_process(websocket: WebSocket):
     await websocket.accept()
     cap = cv2.VideoCapture(RTMP_URL)  # Open the RTMP stream
+
+    # Setup FFmpeg stream process
+    rtmp_url = "rtmp://192.168.1.3:1900/processed-video-stream"
+    process = (
+        ffmpeg
+        .input('pipe:', format='rawvideo', pix_fmt='bgr24', s='{}x{}'.format(int(cap.get(3)), int(cap.get(4))))
+        .output(rtmp_url, format='flv', vcodec='libx264', pix_fmt='yuv420p', preset='fast')
+        .overwrite_output()
+        .run_async(pipe_stdin=True)
+    )
 
     try:
         while True:
@@ -70,15 +130,40 @@ async def video_process(websocket: WebSocket):
             # Process the frame using the loaded model
             processed_frame = process_frame(frame)
 
-            # Encode frame as JPEG and send it over WebSocket
-            _, buffer = cv2.imencode('.jpg', processed_frame)
-            await websocket.send_bytes(buffer.tobytes())
+            # # Encode frame as JPEG and send it over WebSocket
+            # _, buffer = cv2.imencode('.jpg', processed_frame)
+            # await websocket.send_bytes(buffer.tobytes())
+
+            # Write the processed frame to FFmpeg stdin
+            process.stdin.write(
+                processed_frame.tobytes()
+            )
     finally:
         cap.release()  # Release the video capture object
+        process.stdin.close()
+        process.wait()
         await websocket.close()
 
 def process_frame(frame):
-    return frame
+    results = model.predict(frame)
+
+    # Assuming 'results[0]' is a 'Boxes' object which has properties like 'xyxy' for coordinates
+    boxes = results[0].boxes.xyxy  # This should give us the boxes in (x1, y1, x2, y2) format
+
+    # Check and convert the boxes if it's a PyTorch tensor to a numpy array
+    if isinstance(boxes, torch.Tensor):
+        boxes = boxes.numpy()
+
+    annotated_frame = frame.copy()
+
+    for box in boxes:
+        # Convert box coordinates to integers for cv2.rectangle
+        x1, y1, x2, y2 = map(int, box[:4])
+        
+        # Draw rectangles on the frame
+        annotated_frame = cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+    return annotated_frame
 
     # # Convert the color space from BGR (OpenCV default) to RGB (expected by most PyTorch models)
     # frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
