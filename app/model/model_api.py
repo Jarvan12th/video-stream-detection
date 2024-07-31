@@ -21,8 +21,8 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-RTMP_URL = "rtmp://192.168.1.3:1935/live/source"
-STREAM_URL = "rtmp://192.168.1.3:1935/live/destination"  # Destination RTMP URL
+RTMP_URL = "rtmp://54.253.170.76:1935/live/source"
+STREAM_URL = "rtmp://54.253.170.76:1935/live/destination"  # Destination RTMP URL
 
 # Load the model
 model = torch.load("./video_stream_detection_yolo_model/video_stream_detection_model.pth")
