@@ -30,7 +30,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Ensure the model is properly loaded and moved to the device
 model = torch.load(model_path, map_location=device)
-model.eval()  # Set the model to evaluation mode
+model.val()  # Set the model to evaluation mode
 
 # Define the request and response models
 class ImageURL(BaseModel):
