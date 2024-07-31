@@ -25,10 +25,12 @@ RTMP_URL = "rtmp://54.253.170.76:1935/live/source"
 STREAM_URL = "rtmp://54.253.170.76:1935/live/destination"  # Destination RTMP URL
 
 # Load the model
-model = torch.load("./video_stream_detection_yolo_model/video_stream_detection_model.pth")
-# Move the model to the GPU
+model_path = "./video_stream_detection_yolo_model/video_stream_detection_model.pth"
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = model.to(device)
+
+# Ensure the model is properly loaded and moved to the device
+model = torch.load(model_path, map_location=device)
+model.eval()  # Set the model to evaluation mode
 
 # Define the request and response models
 class ImageURL(BaseModel):
