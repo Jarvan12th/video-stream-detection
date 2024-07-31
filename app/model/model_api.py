@@ -157,7 +157,7 @@ def process_frame(frame):
 
     # Check and convert the boxes if it's a PyTorch tensor to a numpy array
     if isinstance(boxes, torch.Tensor):
-        boxes = boxes.numpy()
+        boxes = boxes.cpu().numpy()
 
     annotated_frame = frame.copy()
 
