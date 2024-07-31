@@ -26,7 +26,9 @@ STREAM_URL = "rtmp://54.253.170.76:1935/live/destination"  # Destination RTMP UR
 
 # Load the model
 model = torch.load("./video_stream_detection_yolo_model/video_stream_detection_model.pth")
-model = model.to('cuda')  # Move the model to GPU for faster inference
+# Move the model to the GPU
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model = model.to(device)
 
 # Define the request and response models
 class ImageURL(BaseModel):
